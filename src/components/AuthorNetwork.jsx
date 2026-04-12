@@ -19,7 +19,7 @@ export default function AuthorNetwork({ nodes, edges }) {
   const simEdgesRef = useRef([])
   const paintSelectionRef = useRef(null)
   const selectedNodeRef = useRef(null)
-  const [visibleN, setVisibleN] = useState(70)
+  const [visibleN, setVisibleN] = useState(100)
   const [institutionFilter, setInstitutionFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [selectedNodeId, setSelectedNodeId] = useState(null)
@@ -48,11 +48,11 @@ export default function AuthorNetwork({ nodes, edges }) {
     let idx = 0
     for (const n of sortedNodes) {
       if (!map[n.institution]) {
-        // Use gray for "Unknown" institution, palette colors for others
+        // Use gray for "Unknown" institution, palette colors for first 9 institutions
         if (n.institution === UNKNOWN_INSTITUTION) {
           map[n.institution] = UNKNOWN_COLOR
         } else {
-          map[n.institution] = PALETTE[idx % PALETTE.length]
+          map[n.institution] = PALETTE[idx % 9]  // Only use first 9 colors
           idx++
         }
       }
@@ -459,13 +459,6 @@ export default function AuthorNetwork({ nodes, edges }) {
             </span>
           </div>
         ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, marginLeft: 4 }}>
-          <svg width="28" height="10">
-            <circle cx="5" cy="5" r="5" fill="none" stroke="#64748B" strokeWidth="1.5" />
-            <circle cx="21" cy="5" r="3" fill="none" stroke="#64748B" strokeWidth="1.5" />
-          </svg>
-          <span style={{ color: "rgba(15,23,42,0.6)" }}>size = papers</span>
-        </div>
       </div>
 
       <svg ref={svgRef} style={{ display: "block", width: "100%", height: "100%" }} />
@@ -494,7 +487,7 @@ export default function AuthorNetwork({ nodes, edges }) {
             {tooltip.d.institution}
           </div>
           <div style={{ marginTop: 4, fontSize: 11 }}>
-            {tooltip.d.paperCount} works in subfield
+            {tooltip.d.paperCount} works
           </div>
           <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 3 }}>
             Articles: {tooltip.d.workTypes?.article ?? 0} ·

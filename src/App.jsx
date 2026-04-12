@@ -53,12 +53,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col">
       <header className="px-8 py-4 border-b border-black/10">
-        <h1 className="text-xl font-semibold tracking-wide">
-          OpenAlex — Scholarly Knowledge Map
+        <h1 className="text-xl font-semibold tracking-wide" style={{ paddingLeft: "15px" }}>
+          Research Explorer
         </h1>
-        <p className="text-sm text-black/50 mt-0.5">
-          Circle size = works count · Color = domain
-        </p>
+
       </header>
 
       <main

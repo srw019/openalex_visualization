@@ -67,21 +67,7 @@ export default function AuthorExplorer({
         <span style={{ color: "rgba(15,23,42,0.3)" }}>›</span>
         <span style={{ color: "#0f172a", fontWeight: 600 }}>{subfieldName}</span>
 
-        <button
-          onClick={onBack}
-          style={{
-            marginLeft: "auto",
-            fontSize: 10,
-            padding: "3px 8px",
-            borderRadius: 8,
-            border: "1px solid rgba(0,0,0,0.15)",
-            background: "transparent",
-            color: "rgba(15,23,42,0.65)",
-            cursor: "pointer",
-          }}
-        >
-          ← Back to overview
-        </button>
+
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           {summaryItems.map((s) => (

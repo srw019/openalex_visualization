@@ -266,15 +266,14 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
                 <circle r={Math.max(node.r - 2, 1)} />
               </clipPath>
 
-              {/* Outer ring for nodes that drill down or open Layer 2 */}
-              {isClickable && (
+              {/* Outer ring for parent nodes only (not for subfield leaves) */}
+              {isClickable && hasChildren && (
                 <circle
                   r={node.r + 4}
                   fill="none"
                   stroke={color}
-                  strokeOpacity={isLeaf ? 0.85 : 0.55}
-                  strokeWidth={isLeaf ? 2 : 1.6}
-                  strokeDasharray={isLeaf ? "4 3" : undefined}
+                  strokeOpacity={0.55}
+                  strokeWidth={1.6}
                 />
               )}
 

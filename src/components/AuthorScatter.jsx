@@ -51,8 +51,18 @@ export default function AuthorScatter({ nodes }) {
     const pw = W - pad.l - pad.r
     const ph = H - pad.t - pad.b
 
-    const maxWorks = Math.max(...nodes.map((n) => n.paperCount), 1)
-    const maxCit = Math.max(...nodes.map((n) => n.citations ?? 0), 1)
+    // Get top 50 authors by paper count
+    const top50 = [...nodes]
+      .sort((a, b) => b.paperCount - a.paperCount)
+      .slice(0, 50)
+
+    // Use 95th percentile on filtered data to compress outliers and reduce empty space
+    const worksSorted = [...top50.map((n) => n.paperCount)].sort((a, b) => a - b)
+    const citSorted = [...top50.map((n) => n.citations ?? 0)].sort((a, b) => a - b)
+    const idx95 = Math.floor(top50.length * 0.95)
+    const maxWorks = Math.max(worksSorted[idx95] || 1, 1) * 1.15
+    const maxCit = Math.max(citSorted[idx95] || 1, 1) * 1.15
+    
     const xS = d3.scaleSymlog().domain([0, maxWorks]).range([0, pw]).constant(2.5)
     const yS = d3.scaleSymlog().domain([0, maxCit]).range([ph, 0]).constant(4.5)
 
@@ -129,12 +139,15 @@ export default function AuthorScatter({ nodes }) {
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "rgba(15,23,42,0.5)")
-      .text("Number of works")
+      .text("Total works")
 
 
     const srchLower = search.toLowerCase().trim()
-    const plottedNodes = nodes.map((a) => {
-      const r = Math.max(5, Math.sqrt(a.paperCount) * 2)
+    const plottedNodes = top50.map((a) => {
+      // Cap radius at 95th percentile to prevent outliers from being huge
+      const paperCap = Math.max(worksSorted[idx95] || a.paperCount, a.paperCount)
+      const cappedPapers = Math.min(a.paperCount, paperCap)
+      const r = Math.max(5, Math.sqrt(cappedPapers) * 2)
       const col = instColorMap[a.institution] ?? UNKNOWN_COLOR
       const isMatch =
         !srchLower ||
@@ -225,8 +238,6 @@ export default function AuthorScatter({ nodes }) {
           style={{ ...inp, width: 170 }}
         />
         {search && <button onClick={() => setSearch("")} style={btn}>Clear</button>}
-        <span style={tag}>Mackinlay: position → quantity</span>
-        <span style={tag}>Gestalt: proximity → cluster</span>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingRight: LEGEND_WIDTH + 8, position: "relative" }}>
@@ -262,13 +273,6 @@ export default function AuthorScatter({ nodes }) {
             </span>
           </div>
         ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, marginLeft: 4 }}>
-          <svg width="32" height="12">
-            <circle cx="6" cy="6" r="6" fill="none" stroke="rgba(15,23,42,0.3)" strokeWidth="1.2" />
-            <circle cx="23" cy="6" r="3.5" fill="none" stroke="rgba(15,23,42,0.3)" strokeWidth="1.2" />
-          </svg>
-          <span style={{ color: "rgba(15,23,42,0.6)" }}>node size = works</span>
-        </div>
       </div>
 
       {tooltip && (
