@@ -3,6 +3,8 @@ import { useAuthorNetwork } from "../hooks/useAuthorNetwork.js"
 import AuthorNetwork from "./AuthorNetwork.jsx"
 import AuthorScatter from "./AuthorScatter.jsx"
 
+const MAX_VISIBLE_AUTHORS = 100
+
 export default function AuthorExplorer({
   subfieldId,
   subfieldName,
@@ -15,7 +17,13 @@ export default function AuthorExplorer({
   height,
 }) {
   const [activeTab, setActiveTab] = useState("network")
+  const [visibleN, setVisibleN] = useState(50)
   const { nodes, edges, stats, loading, error } = useAuthorNetwork(subfieldId)
+  const visibleMax = Math.min(MAX_VISIBLE_AUTHORS, nodes.length)
+  const minVisible = visibleMax ? Math.min(5, visibleMax) : 5
+  const visibleNClamped = visibleMax
+    ? Math.min(Math.max(visibleN, minVisible), visibleMax)
+    : visibleN
 
   const handleFieldClick = () => {
     if (field && onBackToField) onBackToField(field)
@@ -181,8 +189,23 @@ export default function AuthorExplorer({
 
         {!loading && !error && nodes.length >= 3 && (
           <>
-            {activeTab === "network" && <AuthorNetwork nodes={nodes} edges={edges} />}
-            {activeTab === "scatter" && <AuthorScatter nodes={nodes} />}
+            {activeTab === "network" && (
+              <AuthorNetwork
+                nodes={nodes}
+                edges={edges}
+                visibleN={visibleNClamped}
+                onVisibleNChange={setVisibleN}
+                visibleMax={visibleMax}
+              />
+            )}
+            {activeTab === "scatter" && (
+              <AuthorScatter
+                nodes={nodes}
+                visibleN={visibleNClamped}
+                onVisibleNChange={setVisibleN}
+                visibleMax={visibleMax}
+              />
+            )}
           </>
         )}
       </div>

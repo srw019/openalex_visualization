@@ -5,7 +5,7 @@ const MAILTO = "srw019@uregina.ca"
 const WORKS_PAGE_SIZE = 200
 const MAX_WORKS_SCAN = 1200
 const MAX_INSTITUTIONS = 10
-const MAX_AUTHORS = 50
+const MAX_AUTHORS = 100
 
 const INITIAL_STATE = {
   nodes: [],

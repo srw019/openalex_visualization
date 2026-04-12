@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 
-// Match AuthorNetwork palette for institution consistency across tabs.
 const PALETTE = [
   "#378ADD", "#1D9E75", "#D85A30", "#BA7517",
   "#7F77DD", "#D4537E", "#639922", "#5F5E5A",
@@ -10,12 +9,35 @@ const PALETTE = [
 const UNKNOWN_COLOR = "#A0A0A0"
 const LEGEND_WIDTH = 190
 
-export default function AuthorScatter({ nodes }) {
+function matchesAuthorName(authorName, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+
+  const queryTokens = q.split(/\s+/).filter(Boolean)
+  const nameTokens = authorName
+    .toLowerCase()
+    .split(/[\s.,'`-]+/)
+    .filter(Boolean)
+
+  if (queryTokens.length === 1) {
+    return nameTokens.some((t) => t === queryTokens[0])
+  }
+
+  for (let i = 0; i <= nameTokens.length - queryTokens.length; i++) {
+    const isSequenceMatch = queryTokens.every((qt, j) => nameTokens[i + j] === qt)
+    if (isSequenceMatch) return true
+  }
+
+  return false
+}
+
+export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visibleMax }) {
   const svgRef = useRef(null)
-  const containerRef = useRef(null)
+  const plotAreaRef = useRef(null)
   const [search, setSearch] = useState("")
   const [tooltip, setTooltip] = useState(null)
   const [dims, setDims] = useState({ width: 600, height: 400 })
+  const minVisible = Math.min(5, Math.max(1, visibleMax))
 
   const instColorMap = useMemo(() => {
     const map = {}
@@ -33,152 +55,150 @@ export default function AuthorScatter({ nodes }) {
   }, [nodes])
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!plotAreaRef.current) return
     const ro = new ResizeObserver(([entry]) => {
       setDims({
         width: entry.contentRect.width,
         height: Math.max(entry.contentRect.height, 200),
       })
     })
-    ro.observe(containerRef.current)
+    ro.observe(plotAreaRef.current)
     return () => ro.disconnect()
   }, [])
 
   const draw = useCallback(() => {
-    const W = Math.max(dims.width - LEGEND_WIDTH - 18, 260)
-    const H = dims.height
-    const pad = { l: 66, r: 28, t: 28, b: 58 }
-    const pw = W - pad.l - pad.r
-    const ph = H - pad.t - pad.b
+    const chartWidth = Math.max(dims.width, 220)
+    const chartHeight = dims.height
+    const padding = { left: 66, right: 28, top: 28, bottom: 58 }
+    const plotWidth = chartWidth - padding.left - padding.right
+    const plotHeight = chartHeight - padding.top - padding.bottom
 
-    // Get top 50 authors by paper count
-    const top50 = [...nodes]
+    const visibleNodes = [...nodes]
       .sort((a, b) => b.paperCount - a.paperCount)
-      .slice(0, 50)
+      .slice(0, visibleN)
 
-    // Use 95th percentile on filtered data to compress outliers and reduce empty space
-    const worksSorted = [...top50.map((n) => n.paperCount)].sort((a, b) => a - b)
-    const citSorted = [...top50.map((n) => n.citations ?? 0)].sort((a, b) => a - b)
-    const idx95 = Math.floor(top50.length * 0.95)
-    const maxWorks = Math.max(worksSorted[idx95] || 1, 1) * 1.15
-    const maxCit = Math.max(citSorted[idx95] || 1, 1) * 1.15
-    
-    const xS = d3.scaleSymlog().domain([0, maxWorks]).range([0, pw]).constant(2.5)
-    const yS = d3.scaleSymlog().domain([0, maxCit]).range([ph, 0]).constant(4.5)
+    const maxWorksRaw = d3.max(visibleNodes, (n) => n.paperCount) ?? 1
+    const maxCitRaw = d3.max(visibleNodes, (n) => n.citations ?? 0) ?? 1
+    const maxWorks = Math.max(1, maxWorksRaw) * 1.05
+    const maxCit = Math.max(1, maxCitRaw) * 1.05
+
+    const xScale = d3.scaleLinear().domain([0, maxWorks]).nice().range([0, plotWidth]).clamp(true)
+    const yScale = d3.scaleLinear().domain([0, maxCit]).nice().range([plotHeight, 0]).clamp(true)
 
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
-    svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`)
+    svg.attr("width", chartWidth).attr("height", chartHeight).attr("viewBox", `0 0 ${chartWidth} ${chartHeight}`)
 
-    const g = svg.append("g").attr("transform", `translate(${pad.l},${pad.t})`)
+    const chartLayer = svg.append("g").attr("transform", `translate(${padding.left},${padding.top})`)
+    svg
+      .append("defs")
+      .append("clipPath")
+      .attr("id", "author-scatter-clip")
+      .append("rect")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("width", plotWidth)
+      .attr("height", plotHeight)
 
-    for (let i = 0; i <= 4; i++) {
-      const yy = Math.round(ph * (1 - i / 4))
-      g.append("line")
+    const nodeLayer = chartLayer.append("g").attr("clip-path", "url(#author-scatter-clip)")
+
+    const xTicks = xScale.ticks(5)
+    const yTicks = yScale.ticks(5)
+
+    for (const tick of yTicks) {
+      const yy = yScale(tick)
+      chartLayer.append("line")
         .attr("x1", 0)
         .attr("y1", yy)
-        .attr("x2", pw)
+        .attr("x2", plotWidth)
         .attr("y2", yy)
         .attr("stroke", "rgba(0,0,0,0.07)")
         .attr("stroke-width", 0.5)
 
-      const yVal = Math.round((i / 4) * maxCit)
-      g.append("text")
+      chartLayer.append("text")
         .attr("x", -6)
         .attr("y", yy + 4)
         .attr("text-anchor", "end")
         .attr("font-size", 9)
         .attr("fill", "rgba(15,23,42,0.45)")
-        .text(yVal >= 1000 ? `${Math.round(yVal / 1000)}k` : yVal)
+        .text(tick >= 1000 ? `${Math.round(tick / 1000)}k` : Math.round(tick))
+    }
 
-      const xx = Math.round((pw * i) / 4)
-      g.append("line")
+    for (const tick of xTicks) {
+      const xx = xScale(tick)
+      chartLayer.append("line")
         .attr("x1", xx)
         .attr("y1", 0)
         .attr("x2", xx)
-        .attr("y2", ph)
+        .attr("y2", plotHeight)
         .attr("stroke", "rgba(0,0,0,0.07)")
         .attr("stroke-width", 0.5)
 
-      g.append("text")
+      chartLayer.append("text")
         .attr("x", xx)
-        .attr("y", ph + 14)
+        .attr("y", plotHeight + 14)
         .attr("text-anchor", "middle")
         .attr("font-size", 9)
         .attr("fill", "rgba(15,23,42,0.45)")
-        .text(Math.round((i / 4) * maxWorks))
+        .text(tick >= 1000 ? `${Math.round(tick / 1000)}k` : Math.round(tick))
     }
 
-    g.append("line")
+    chartLayer.append("line")
       .attr("x1", 0)
-      .attr("y1", ph)
-      .attr("x2", pw)
-      .attr("y2", ph)
+      .attr("y1", plotHeight)
+      .attr("x2", plotWidth)
+      .attr("y2", plotHeight)
       .attr("stroke", "rgba(0,0,0,0.22)")
       .attr("stroke-width", 0.8)
-    g.append("line")
+    chartLayer.append("line")
       .attr("x1", 0)
       .attr("y1", 0)
       .attr("x2", 0)
-      .attr("y2", ph)
+      .attr("y2", plotHeight)
       .attr("stroke", "rgba(0,0,0,0.22)")
       .attr("stroke-width", 0.8)
 
-    g.append("text")
+    chartLayer.append("text")
       .attr("transform", "rotate(-90)")
-      .attr("x", -(ph / 2))
+      .attr("x", -(plotHeight / 2))
       .attr("y", -44)
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "rgba(15,23,42,0.5)")
       .text("Total citations")
 
-    g.append("text")
-      .attr("x", pw / 2)
-      .attr("y", ph + 42)
+    chartLayer.append("text")
+      .attr("x", plotWidth / 2)
+      .attr("y", plotHeight + 42)
       .attr("text-anchor", "middle")
       .attr("font-size", 10)
       .attr("fill", "rgba(15,23,42,0.5)")
       .text("Total works")
 
 
-    const srchLower = search.toLowerCase().trim()
-    const plottedNodes = top50.map((a) => {
-      // Cap radius at 95th percentile to prevent outliers from being huge
-      const paperCap = Math.max(worksSorted[idx95] || a.paperCount, a.paperCount)
-      const cappedPapers = Math.min(a.paperCount, paperCap)
-      const r = Math.max(5, Math.sqrt(cappedPapers) * 2)
+    const searchQuery = search.toLowerCase().trim()
+    const plottedNodes = visibleNodes.map((a) => {
+      const r = Math.max(5, Math.sqrt(a.paperCount) * 1.6)
       const col = instColorMap[a.institution] ?? UNKNOWN_COLOR
-      const isMatch =
-        !srchLower ||
-        a.name.toLowerCase().includes(srchLower) ||
-        a.institution.toLowerCase().includes(srchLower)
+      const isMatch = matchesAuthorName(a.name, searchQuery)
+      const x = xScale(a.paperCount)
+      const y = yScale(a.citations ?? 0)
       return {
         ...a,
         r,
         col,
         isMatch,
-        op: srchLower && !isMatch ? 0.06 : 1,
-        tx: xS(a.paperCount),
-        ty: yS(a.citations ?? 0),
-        x: xS(a.paperCount),
-        y: yS(a.citations ?? 0),
+        op: searchQuery && !isMatch ? 0.06 : 1,
+        x,
+        y,
       }
     })
 
-    const sim = d3.forceSimulation(plottedNodes)
-      .force("x", d3.forceX((d) => d.tx).strength(0.32))
-      .force("y", d3.forceY((d) => d.ty).strength(0.32))
-      .force("collide", d3.forceCollide((d) => d.r + 3.5))
-      .alpha(0.9)
-      .alphaDecay(0.08)
-      .stop()
-
-    for (let i = 0; i < 140; i++) sim.tick()
-
     plottedNodes.forEach((a) => {
-      const glow = a.isMatch && srchLower ? 0.18 : 0
-      const ng = g
+      a.x = Math.max(a.r, Math.min(plotWidth - a.r, a.x))
+      a.y = Math.max(a.r, Math.min(plotHeight - a.r, a.y))
+      const glow = a.isMatch && searchQuery ? 0.18 : 0
+      const ng = nodeLayer
         .append("g")
         .attr("transform", `translate(${a.x},${a.y})`)
         .attr("opacity", a.op)
@@ -204,7 +224,7 @@ export default function AuthorScatter({ nodes }) {
         )
         .on("mouseleave", () => setTooltip(null))
     })
-  }, [dims, instColorMap, nodes, search])
+  }, [dims, instColorMap, nodes, search, visibleN])
 
   useEffect(() => {
     if (!nodes.length || !svgRef.current) return
@@ -213,7 +233,6 @@ export default function AuthorScatter({ nodes }) {
 
   return (
     <div
-      ref={containerRef}
       style={{
         width: "100%",
         height: "100%",
@@ -229,50 +248,60 @@ export default function AuthorScatter({ nodes }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8, flexShrink: 0 }}>
+        <span style={lbl}>Authors</span>
+        <input
+          type="range"
+          min={minVisible}
+          max={Math.max(minVisible, visibleMax)}
+          step={1}
+          value={visibleN}
+          onChange={(e) => onVisibleNChange(Number(e.target.value))}
+          style={{ width: 70 }}
+        />
+        <span style={{ ...lbl, color: "#0f172a", fontWeight: 600, minWidth: 20 }}>{visibleN}</span>
+
         <span style={lbl}>Search</span>
         <input
           type="text"
           value={search}
-          placeholder="author or institution..."
+          placeholder="search author name..."
           onChange={(e) => setSearch(e.target.value)}
           style={{ ...inp, width: 170 }}
         />
         {search && <button onClick={() => setSearch("")} style={btn}>Clear</button>}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingRight: LEGEND_WIDTH + 8, position: "relative" }}>
-        <svg ref={svgRef} style={{ display: "block" }} />
-      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", gap: 8 }}>
+        <div ref={plotAreaRef} style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: "hidden" }}>
+          <svg ref={svgRef} style={{ display: "block", width: "100%", height: "100%" }} />
+        </div>
 
-      {/* Side legend (same placement style as network view) */}
-      <div
-        style={{
-          position: "absolute",
-          top: 54,
-          right: 12,
-          zIndex: 10,
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          background: "rgba(248,250,252,0.9)",
-          padding: "5px 8px",
-          borderRadius: 8,
-          border: "1px solid rgba(0,0,0,0.12)",
-          width: LEGEND_WIDTH - 10,
-          maxHeight: "calc(100% - 80px)",
-          overflowY: "auto",
-        }}
-      >
-        {Object.entries(instColorMap).map(([inst, col]) => (
-          <div key={inst} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
-            <svg width="16" height="16">
-              <circle cx="8" cy="8" r="5" fill={col} />
-            </svg>
-            <span style={{ color: "rgba(15,23,42,0.75)" }}>
-              {inst.length > 14 ? `${inst.slice(0, 12)}…` : inst}
-            </span>
-          </div>
-        ))}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            background: "rgba(248,250,252,0.9)",
+            padding: "5px 8px",
+            borderRadius: 8,
+            border: "1px solid rgba(0,0,0,0.12)",
+            width: LEGEND_WIDTH - 10,
+            maxHeight: "100%",
+            overflowY: "auto",
+            flexShrink: 0,
+          }}
+        >
+          {Object.entries(instColorMap).map(([inst, col]) => (
+            <div key={inst} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+              <svg width="16" height="16">
+                <circle cx="8" cy="8" r="5" fill={col} />
+              </svg>
+              <span style={{ color: "rgba(15,23,42,0.75)" }}>
+                {inst.length > 14 ? `${inst.slice(0, 12)}…` : inst}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {tooltip && (
@@ -290,4 +319,3 @@ export default function AuthorScatter({ nodes }) {
 const lbl = { fontSize: 11, color: "rgba(15,23,42,0.65)", whiteSpace: "nowrap" }
 const inp = { fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.18)", background: "#fff", color: "#0f172a" }
 const btn = { fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.18)", background: "transparent", color: "rgba(15,23,42,0.65)", cursor: "pointer" }
-const tag = { fontSize: 10, padding: "2px 7px", borderRadius: 20, background: "rgba(59,130,246,0.1)", color: "#2563eb", whiteSpace: "nowrap" }

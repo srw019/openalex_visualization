@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react"
 import * as d3 from "d3"
-// we were here 8 48
-// 10-color palette — one per institution in order of first appearance
+
 const PALETTE = [
   "#378ADD", "#1D9E75", "#D85A30", "#BA7517",
   "#7F77DD", "#D4537E", "#639922", "#5F5E5A",
@@ -12,47 +11,63 @@ const UNKNOWN_COLOR = "#A0A0A0"
 
 const getNodeId = (value) => value?.id ?? value
 
-export default function AuthorNetwork({ nodes, edges }) {
+function matchesAuthorName(authorName, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+
+  const queryTokens = q.split(/\s+/).filter(Boolean)
+  const nameTokens = authorName
+    .toLowerCase()
+    .split(/[\s.,'`-]+/)
+    .filter(Boolean)
+
+  if (queryTokens.length === 1) {
+    return nameTokens.some((t) => t === queryTokens[0])
+  }
+
+  for (let i = 0; i <= nameTokens.length - queryTokens.length; i++) {
+    const isSequenceMatch = queryTokens.every((qt, j) => nameTokens[i + j] === qt)
+    if (isSequenceMatch) return true
+  }
+
+  return false
+}
+
+export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange, visibleMax }) {
   const svgRef = useRef(null)
   const zoomBehaviorRef = useRef(null)
   const simNodesRef = useRef([])
   const simEdgesRef = useRef([])
   const paintSelectionRef = useRef(null)
   const selectedNodeRef = useRef(null)
-  const [visibleN, setVisibleN] = useState(100)
   const [institutionFilter, setInstitutionFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [tooltip, setTooltip] = useState(null)
+  const minVisible = Math.min(5, Math.max(1, visibleMax))
 
-  const getTopNodes = (sourceNodes, filterValue, limit) =>
+  const getVisibleAuthors = (sourceNodes, filterValue, limit) =>
     sourceNodes
       .filter((n) => filterValue === "all" || n.institution === filterValue)
       .sort((a, b) => b.paperCount - a.paperCount)
       .slice(0, limit)
 
-  // Filter by institution first, then rank by paper count
   const filteredNodes = useMemo(
-    () => getTopNodes(nodes, institutionFilter, visibleN),
+    () => getVisibleAuthors(nodes, institutionFilter, visibleN),
     [nodes, institutionFilter, visibleN]
   )
 
-  // Sort nodes by paper count descending, then slice to visibleN
-  // Mackinlay: area encodes quantitative (paper count)
   const sortedNodes = filteredNodes
 
-  // Assign stable colors to institutions
-  // Mackinlay: color hue encodes nominal (institution)
   const instColorMap = useMemo(() => {
     const map = {}
     let idx = 0
     for (const n of sortedNodes) {
       if (!map[n.institution]) {
-        // Use gray for "Unknown" institution, palette colors for first 9 institutions
         if (n.institution === UNKNOWN_INSTITUTION) {
           map[n.institution] = UNKNOWN_COLOR
         } else {
-          map[n.institution] = PALETTE[idx % 9]  // Only use first 9 colors
+          map[n.institution] = PALETTE[idx % 9]
           idx++
         }
       }
@@ -62,7 +77,6 @@ export default function AuthorNetwork({ nodes, edges }) {
 
   const institutions = useMemo(() => ["all", ...Object.keys(instColorMap)], [instColorMap])
 
-  // Filter edges to only those connecting visible nodes
   const visibleIds = useMemo(() => new Set(sortedNodes.map((n) => n.id)), [sortedNodes])
   const visibleEdges = useMemo(
     () => edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)),
@@ -73,13 +87,12 @@ export default function AuthorNetwork({ nodes, edges }) {
     const q = searchValue.trim().toLowerCase()
     if (!q) return null
 
-    const matchedAuthor = getTopNodes(nodes, nextInstitutionFilter, nextVisibleN)
-      .find((n) => n.name.toLowerCase().includes(q))
+    const matchedAuthor = getVisibleAuthors(nodes, nextInstitutionFilter, nextVisibleN)
+      .find((n) => matchesAuthorName(n.name, q))
 
     return matchedAuthor?.id ?? null
   }
 
-  // Sync selectedNodeId state to ref for the tick handler to read
   useEffect(() => {
     selectedNodeRef.current = selectedNodeId
   }, [selectedNodeId])
@@ -105,13 +118,11 @@ export default function AuthorNetwork({ nodes, edges }) {
         setSelectedNodeId(null)
       })
 
-    // Deep-copy nodes and edges for D3 mutation
     const simNodes = sortedNodes.map((n) => ({ ...n }))
     const simEdges = visibleEdges.map((e) => ({ ...e }))
     simNodesRef.current = simNodes
     simEdgesRef.current = simEdges
 
-    // Add zoom + pan
     const g = svg.append("g")
     const zoomBehavior = d3.zoom()
       .scaleExtent([0.3, 3])
@@ -124,19 +135,14 @@ export default function AuthorNetwork({ nodes, edges }) {
       n.y = height / 2 + (Math.random() - 0.5) * 180
     })
 
-    // ── Force simulation ─────────────────────────────────────────────
     const sim = d3.forceSimulation(simNodes)
-      // Gestalt: Connectedness — link force pulls co-authors together
       .force("link",
         d3.forceLink(simEdges)
           .id((d) => d.id)
           .distance((d) => Math.max(65, 120 - (d.weight ?? 1) * 10))
           .strength((d) => Math.min(0.55, 0.18 + (d.weight ?? 1) * 0.06))
       )
-      // Repulsion keeps nodes from overlapping
       .force("charge", d3.forceManyBody().strength(-280))
-      // Collision radius accounts for node size
-      // Mackinlay: area encodes paper count → radius = sqrt * 3
       .force("collide",
         d3.forceCollide().radius((d) => Math.sqrt(d.paperCount) * 3 + 18)
       )
@@ -145,15 +151,12 @@ export default function AuthorNetwork({ nodes, edges }) {
       .force("y", d3.forceY(height / 2).strength(0.03))
       .alphaDecay(0.025)
 
-    // ── Draw edges ───────────────────────────────────────────────────
-    // Bertin: stroke-width (visual weight) encodes collaboration strength
     const linkSel = g.append("g").selectAll("line")
       .data(simEdges)
       .join("line")
       .attr("stroke", "rgba(51,65,85,0.55)")
       .attr("stroke-width", (d) => Math.max(0.6, d.weight * 0.8))
 
-    // ── Draw nodes ───────────────────────────────────────────────────
     const nodeSel = g.append("g").selectAll("g")
       .data(simNodes)
       .join("g")
@@ -228,15 +231,12 @@ export default function AuthorNetwork({ nodes, edges }) {
       setSelectedNodeId(null)
     })
 
-    // Node circle — fill white, border = institution color
-    // This separates institution encoding (border) from author identity (label inside)
     const nodeCircleSel = nodeSel.append("circle")
       .attr("r", (d) => Math.max(7, Math.sqrt(d.paperCount) * 3))
       .attr("fill", "#111")
       .attr("stroke", (d) => instColorMap[d.institution] ?? "#888")
       .attr("stroke-width", 2)
 
-    // Paper count inside circle
     nodeSel.append("text")
       .text((d) => d.paperCount)
       .attr("text-anchor", "middle")
@@ -246,7 +246,6 @@ export default function AuthorNetwork({ nodes, edges }) {
       .attr("font-weight", "600")
       .attr("pointer-events", "none")
 
-    // Author name below node
     nodeSel.append("text")
       .text((d) => d.name.split(" ").pop())
       .attr("text-anchor", "middle")
@@ -255,7 +254,6 @@ export default function AuthorNetwork({ nodes, edges }) {
       .attr("fill", "rgba(15,23,42,0.78)")
       .attr("pointer-events", "none")
 
-    // ── Tick handler ─────────────────────────────────────────────────
     sim.on("tick", () => {
       linkSel
         .attr("x1", (d) => d.source.x)
@@ -334,7 +332,6 @@ export default function AuthorNetwork({ nodes, edges }) {
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
-      {/* Controls */}
       <div
         style={{
           position: "absolute",
@@ -353,14 +350,13 @@ export default function AuthorNetwork({ nodes, edges }) {
           color: "rgba(15,23,42,0.72)",
         }}
       >
-        {/* Data-to-ink: slider removes low-signal nodes */}
         <span>Authors</span>
         <input
-          type="range" min={5} max={nodes.length} step={1}
+          type="range" min={minVisible} max={Math.max(minVisible, visibleMax)} step={1}
           value={visibleN}
           onChange={(e) => {
             const nextVisibleN = Number(e.target.value)
-            setVisibleN(nextVisibleN)
+            onVisibleNChange(nextVisibleN)
 
             const nextSelectedNodeId = resolveSelectedNodeId(search, institutionFilter, nextVisibleN)
             selectedNodeRef.current = nextSelectedNodeId
