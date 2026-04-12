@@ -43,6 +43,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
       name: currentNode.name,
       children: (currentNode.children ?? []).map((child) => ({
         ...child,
+        child_count: child.children?.length ?? 0,
         children: undefined,
         value: Math.sqrt(Math.max(child.works_count ?? child.value ?? 1, 1)),
       })),
