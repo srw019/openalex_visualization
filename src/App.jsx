@@ -75,13 +75,39 @@ export default function App() {
           </div>
         )}
         {data && !selectedSubfield && (
-          <CirclePack
-            data={data}
-            width={dims.width}
-            height={dims.height}
-            onSubfieldSelect={handleSubfieldSelect}
-            initialFocusPath={[]}
-          />
+          <>
+            <CirclePack
+              data={data}
+              width={dims.width}
+              height={dims.height}
+              onSubfieldSelect={handleSubfieldSelect}
+              initialFocusPath={[]}
+            />
+            <div
+              style={{
+                position: "absolute",
+                right: 14,
+                bottom: 10,
+                zIndex: 20,
+                fontSize: 11,
+                color: "rgba(15,23,42,0.62)",
+                background: "rgba(248,250,252,0.8)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                borderRadius: 8,
+                padding: "4px 8px",
+              }}
+            >
+              Data source: {" "}
+              <a
+                href="https://openalex.org"
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "#2563eb", textDecoration: "underline" }}
+              >
+                OpenAlex
+              </a>
+            </div>
+          </>
         )}
         {data && selectedSubfield?.type === 'field' && (
           <CirclePack
