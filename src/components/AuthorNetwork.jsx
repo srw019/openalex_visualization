@@ -40,21 +40,28 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   const simEdgesRef = useRef([])
   const paintSelectionRef = useRef(null)
   const selectedNodeRef = useRef(null)
-  const [institutionFilter, setInstitutionFilter] = useState("all")
+  const [selectedInstitutions, setSelectedInstitutions] = useState([])
   const [search, setSearch] = useState("")
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [tooltip, setTooltip] = useState(null)
   const minVisible = Math.min(5, Math.max(1, visibleMax))
+  const selectedInstitutionSet = useMemo(() => new Set(selectedInstitutions), [selectedInstitutions])
+  const hasInstitutionFilter = selectedInstitutions.length > 0
 
-  const getVisibleAuthors = (sourceNodes, filterValue, limit) =>
+  const getVisibleAuthors = (sourceNodes, activeInstitutions, limit) =>
     sourceNodes
-      .filter((n) => filterValue === "all" || n.institution === filterValue)
+      .filter((n) => activeInstitutions.length === 0 || activeInstitutions.includes(n.institution))
       .sort((a, b) => b.paperCount - a.paperCount)
       .slice(0, limit)
 
+  const rankedNodes = useMemo(
+    () => [...nodes].sort((a, b) => b.paperCount - a.paperCount).slice(0, visibleN),
+    [nodes, visibleN]
+  )
+
   const filteredNodes = useMemo(
-    () => getVisibleAuthors(nodes, institutionFilter, visibleN),
-    [nodes, institutionFilter, visibleN]
+    () => getVisibleAuthors(nodes, selectedInstitutions, visibleN),
+    [nodes, selectedInstitutions, visibleN]
   )
 
   const sortedNodes = filteredNodes
@@ -62,7 +69,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   const instColorMap = useMemo(() => {
     const map = {}
     let idx = 0
-    for (const n of sortedNodes) {
+    for (const n of rankedNodes) {
       if (!map[n.institution]) {
         if (n.institution === UNKNOWN_INSTITUTION) {
           map[n.institution] = UNKNOWN_COLOR
@@ -73,9 +80,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       }
     }
     return map
-  }, [sortedNodes])
-
-  const institutions = useMemo(() => ["all", ...Object.keys(instColorMap)], [instColorMap])
+  }, [rankedNodes])
 
   const visibleIds = useMemo(() => new Set(sortedNodes.map((n) => n.id)), [sortedNodes])
   const visibleEdges = useMemo(
@@ -83,14 +88,30 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
     [edges, visibleIds]
   )
 
-  const resolveSelectedNodeId = (searchValue, nextInstitutionFilter, nextVisibleN) => {
+  const resolveSelectedNodeId = (searchValue, nextSelectedInstitutions, nextVisibleN) => {
     const q = searchValue.trim().toLowerCase()
     if (!q) return null
 
-    const matchedAuthor = getVisibleAuthors(nodes, nextInstitutionFilter, nextVisibleN)
+    const matchedAuthor = getVisibleAuthors(nodes, nextSelectedInstitutions, nextVisibleN)
       .find((n) => matchesAuthorName(n.name, q))
 
     return matchedAuthor?.id ?? null
+  }
+
+  const applyInstitutionFilter = (nextSelectedInstitutions) => {
+    setSelectedInstitutions(nextSelectedInstitutions)
+
+    const nextSelectedNodeId = resolveSelectedNodeId(search, nextSelectedInstitutions, visibleN)
+    selectedNodeRef.current = nextSelectedNodeId
+    setSelectedNodeId(nextSelectedNodeId)
+  }
+
+  const toggleInstitution = (institution) => {
+    if (selectedInstitutionSet.has(institution)) {
+      applyInstitutionFilter(selectedInstitutions.filter((item) => item !== institution))
+      return
+    }
+    applyInstitutionFilter([...selectedInstitutions, institution])
   }
 
   useEffect(() => {
@@ -204,7 +225,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       nodeSel.attr("opacity", (d) =>
         currentSelectedId
           ? (selectedNeighbors.has(d.id) ? 1 : 0.08)
-          : (institutionFilter === "all" || d.institution === institutionFilter ? 1 : 0.12)
+          : (!hasInstitutionFilter || selectedInstitutionSet.has(d.institution) ? 1 : 0.12)
       )
 
       nodeCircleSel
@@ -217,10 +238,10 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           const targetId = getNodeId(d.target)
           return sourceId === currentSelectedId || targetId === currentSelectedId ? 0.85 : 0.05
         }
-        if (institutionFilter === "all") return 0.7
+        if (!hasInstitutionFilter) return 0.7
         const sInst = simNodes.find((n) => n.id === getNodeId(d.source))?.institution
         const tInst = simNodes.find((n) => n.id === getNodeId(d.target))?.institution
-        return sInst === institutionFilter || tInst === institutionFilter ? 0.6 : 0.05
+        return selectedInstitutionSet.has(sInst) || selectedInstitutionSet.has(tInst) ? 0.6 : 0.05
       })
     }
 
@@ -267,11 +288,11 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
     })
 
     return () => sim.stop()
-  }, [sortedNodes, visibleEdges, instColorMap, institutionFilter])
+  }, [sortedNodes, visibleEdges, instColorMap, hasInstitutionFilter, selectedInstitutionSet])
 
   useEffect(() => {
     paintSelectionRef.current?.()
-  }, [selectedNodeId, institutionFilter, search, visibleN])
+  }, [selectedNodeId, selectedInstitutions, search, visibleN])
 
   useEffect(() => {
     const svgElement = d3.select(svgRef.current)
@@ -358,7 +379,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
             const nextVisibleN = Number(e.target.value)
             onVisibleNChange(nextVisibleN)
 
-            const nextSelectedNodeId = resolveSelectedNodeId(search, institutionFilter, nextVisibleN)
+            const nextSelectedNodeId = resolveSelectedNodeId(search, selectedInstitutions, nextVisibleN)
             selectedNodeRef.current = nextSelectedNodeId
             setSelectedNodeId(nextSelectedNodeId)
           }}
@@ -373,7 +394,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
             const nextSearch = e.target.value
             setSearch(nextSearch)
 
-            const nextSelectedNodeId = resolveSelectedNodeId(nextSearch, institutionFilter, visibleN)
+            const nextSelectedNodeId = resolveSelectedNodeId(nextSearch, selectedInstitutions, visibleN)
             selectedNodeRef.current = nextSelectedNodeId
             setSelectedNodeId(nextSelectedNodeId)
           }}
@@ -388,28 +409,6 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
             color: "#0f172a",
           }}
         />
-
-        <span style={{ marginLeft: 4 }}>Institution</span>
-        <select
-          value={institutionFilter}
-          onChange={(e) => {
-            const nextInstitutionFilter = e.target.value
-            setInstitutionFilter(nextInstitutionFilter)
-
-            const nextSelectedNodeId = resolveSelectedNodeId(search, nextInstitutionFilter, visibleN)
-            selectedNodeRef.current = nextSelectedNodeId
-            setSelectedNodeId(nextSelectedNodeId)
-          }}
-          style={{
-            fontSize: 11, padding: "3px 6px",
-            borderRadius: 6, border: "1px solid rgba(0,0,0,0.18)",
-            background: "#ffffff", color: "#0f172a",
-          }}
-        >
-          {institutions.map((inst) => (
-            <option key={inst} value={inst}>{inst}</option>
-          ))}
-        </select>
 
         {selectedNodeId && (
           <button
@@ -432,7 +431,6 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
         )}
       </div>
 
-      {/* Legend */}
       <div
         style={{
           position: "absolute", top: 58, right: 12, zIndex: 10,
@@ -445,21 +443,54 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           overflowY: "auto",
         }}
       >
+        <button
+          onClick={() => applyInstitutionFilter([])}
+          style={{
+            fontSize: 10,
+            padding: "3px 6px",
+            borderRadius: 6,
+            border: !hasInstitutionFilter ? "1px solid rgba(37,99,235,0.45)" : "1px solid rgba(0,0,0,0.12)",
+            background: !hasInstitutionFilter ? "rgba(37,99,235,0.12)" : "rgba(255,255,255,0.8)",
+            color: !hasInstitutionFilter ? "#1d4ed8" : "rgba(15,23,42,0.7)",
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          All institutions
+        </button>
         {Object.entries(instColorMap).map(([inst, col]) => (
-          <div key={inst} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+          <button
+            key={inst}
+            onClick={() => toggleInstitution(inst)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              width: "100%",
+              borderRadius: 6,
+              border: selectedInstitutionSet.has(inst) ? "1px solid rgba(0,0,0,0.25)" : "1px solid transparent",
+              background: selectedInstitutionSet.has(inst) ? "rgba(255,255,255,0.85)" : "transparent",
+              padding: "2px 4px",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
             <svg width="16" height="16">
               <circle cx="8" cy="8" r="5" fill={col} />
             </svg>
             <span style={{ color: "rgba(15,23,42,0.75)" }}>
               {inst.length > 14 ? inst.slice(0, 12) + "…" : inst}
             </span>
-          </div>
+            <span style={{ marginLeft: "auto", color: "rgba(15,23,42,0.55)", opacity: selectedInstitutionSet.has(inst) ? 1 : 0 }}>
+              ✓
+            </span>
+          </button>
         ))}
       </div>
 
       <svg ref={svgRef} style={{ display: "block", width: "100%", height: "100%" }} />
 
-      {/* Tooltip */}
       {tooltip && (
         <div
           style={{

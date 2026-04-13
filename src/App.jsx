@@ -1,4 +1,3 @@
-// we were here 8 48
 import { useEffect, useRef, useState } from "react"
 import CirclePack from "./components/CirclePack.jsx"
 import AuthorExplorer from "./components/AuthorExplorer.jsx"
@@ -8,10 +7,6 @@ export default function App() {
   const { data, loading, error } = useOpenAlex()
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ width: 1200, height: 800 })
-  // selectedSubfield can be:
-  // null = show Layer 1 (CirclePack root)
-  // { type: 'field', field: {...} } = show CirclePack focused on a field
-  // { type: 'subfield', subfieldId, subfieldName, fieldName, domainName, field } = show Layer 2 (AuthorExplorer)
   const [selectedSubfield, setSelectedSubfield] = useState(null)
 
   useEffect(() => {
@@ -27,19 +22,17 @@ export default function App() {
   }, [])
 
   const handleSubfieldSelect = (subfieldData) => {
-    // Store the parent field info so we can navigate back to it
     setSelectedSubfield({
       type: 'subfield',
       subfieldId: subfieldData.subfieldId,
       subfieldName: subfieldData.subfieldName,
       fieldName: subfieldData.fieldName,
       domainName: subfieldData.domainName,
-      field: subfieldData.field, // the full field object
+      field: subfieldData.field,
     })
   }
 
   const handleBackToField = (fieldObject) => {
-    // Navigate to CirclePack focused on a specific field
     setSelectedSubfield({
       type: 'field',
       field: fieldObject,
@@ -75,39 +68,13 @@ export default function App() {
           </div>
         )}
         {data && !selectedSubfield && (
-          <>
-            <CirclePack
-              data={data}
-              width={dims.width}
-              height={dims.height}
-              onSubfieldSelect={handleSubfieldSelect}
-              initialFocusPath={[]}
-            />
-            <div
-              style={{
-                position: "absolute",
-                right: 14,
-                bottom: 10,
-                zIndex: 20,
-                fontSize: 11,
-                color: "rgba(15,23,42,0.62)",
-                background: "rgba(248,250,252,0.8)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                borderRadius: 8,
-                padding: "4px 8px",
-              }}
-            >
-              Data source: {" "}
-              <a
-                href="https://openalex.org"
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "#2563eb", textDecoration: "underline" }}
-              >
-                OpenAlex
-              </a>
-            </div>
-          </>
+          <CirclePack
+            data={data}
+            width={dims.width}
+            height={dims.height}
+            onSubfieldSelect={handleSubfieldSelect}
+            initialFocusPath={[]}
+          />
         )}
         {data && selectedSubfield?.type === 'field' && (
           <CirclePack

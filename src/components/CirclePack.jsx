@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 import Tooltip from "./Tooltip.jsx"
-// we were here 8 48
 const PALETTE = [
   "#FF4D6D", "#22C55E", "#F59E0B", "#3B82F6",
   "#A855F7", "#14B8A6", "#EF4444", "#06B6D4",
@@ -85,15 +84,12 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   const handleCircleClick = (node) => {
     const original = originalChildren[node.data.name]
 
-    // Has children → drill down into next level as before
     if (original?.children?.length) {
       setFocusPath((prev) => [...prev, original])
       setTooltip({ node: null, x: 0, y: 0 })
       return
     }
 
-    // Leaf node = subfield with no further children → trigger Layer 2
-    // Pass the full hierarchy: domain, field(s), and subfield
     if (original?.id && onSubfieldSelect) {
       const domainName = categoryRoot?.name || "Unknown"
       const fieldName = focusPath.length > 0 ? focusPath[focusPath.length - 1].name : "Unknown"
@@ -105,7 +101,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
         subfieldName: subfieldName,
         fieldName: fieldName,
         domainName: domainName,
-        field: parentField, // pass the parent field object for back navigation
+        field: parentField,
       })
     }
   }
@@ -132,7 +128,6 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   return (
     <div ref={containerRef} style={{ width, height, position: "relative", background: "#f3f4f6" }}>
 
-      {/* Top header bar */}
       <div style={{
         position: "absolute",
         top: 8,
@@ -186,7 +181,6 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
         </div>
       </div>
 
-      {/* Breadcrumbs */}
       {breadcrumbs.length > 1 && (
         <div style={{
           position: "absolute", top: TOP_UI_HEIGHT + 2, left: 16, zIndex: 10,
@@ -224,7 +218,6 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
             ? (categoryColorMap[node.data.name] ?? PALETTE[i % PALETTE.length])
             : (categoryColorMap[focusPath[0]?.name] ?? PALETTE[0])
           const hasChildren = !!originalChildren[node.data.name]?.children?.length
-          // Leaf nodes at subfield level are clickable to launch Layer 2
           const isLeaf = !hasChildren && !!originalChildren[node.data.name]?.id
           const isClickable = hasChildren || isLeaf
           const fontSize = Math.min(Math.max(node.r / 3.1, 8), 15)
@@ -267,7 +260,6 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
                 <circle r={Math.max(node.r - 2, 1)} />
               </clipPath>
 
-              {/* Outer ring for parent nodes only (not for subfield leaves) */}
               {isClickable && hasChildren && (
                 <circle
                   r={node.r + 4}
@@ -308,7 +300,6 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
                     </text>
                   )}
 
-                  {/* Small indicator on leaf subfield nodes so user knows they are clickable */}
                   {isLeaf && node.r > 28 && (
                     <text
                       textAnchor="middle"

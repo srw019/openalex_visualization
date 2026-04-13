@@ -11,10 +11,9 @@ export function buildHierarchy(domains) {
               name: sub.display_name,
               id: sub.id,
               works_count: sub.works_count ?? 0,
-              value: Math.max(sub.works_count ?? 1, 1), // never 0
+              value: Math.max(sub.works_count ?? 1, 1),
             }))
 
-          // If no subfields, make the field itself a leaf
           if (subChildren.length === 0) {
             return {
               name: field.display_name,
@@ -42,4 +41,3 @@ export function buildHierarchy(domains) {
 
   return { name: "root", children }
 }
-// we were here 8 48

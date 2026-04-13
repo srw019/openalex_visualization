@@ -2,7 +2,6 @@ import { useState, useEffect } from "react"
 
 const BASE = "https://api.openalex.org"
 const MAILTO = "srw019@uregina.ca"
-// we were here 8 48
 
 const getIdSuffix = (openAlexId) => String(openAlexId).split("/").pop()
 
@@ -58,7 +57,6 @@ export function useOpenAlex() {
   useEffect(() => {
     async function fetchAll() {
       try {
-        // 1. Get Physical Sciences domain only
         const domainRes = await fetch(
           `${BASE}/domains?per-page=200&mailto=${MAILTO}`
         )
@@ -69,7 +67,6 @@ export function useOpenAlex() {
 
         if (!physicalSci) throw new Error("Physical Sciences domain not found")
 
-        // 2. Fetch all fields under Physical Sciences (includes subfields)
         const domainId = getIdSuffix(physicalSci.id)
         const fRes = await fetch(
           `${BASE}/fields?filter=domain.id:${domainId}&per-page=200&mailto=${MAILTO}`
@@ -80,7 +77,6 @@ export function useOpenAlex() {
           throw new Error("No fields returned for Physical Sciences from OpenAlex")
         }
 
-        // 3. For each field, fetch its subfields
         const fieldsWithSubs = await Promise.all(
           fJson.results.map(async (field) => {
             const fieldId = getIdSuffix(field.id)

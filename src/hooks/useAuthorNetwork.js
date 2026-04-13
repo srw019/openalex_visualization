@@ -66,9 +66,7 @@ export function useAuthorNetwork(subfieldId) {
       try {
         const works = await fetchWorks()
 
-        // authorId → { id, name, institution, paperCount, citations, workTypes }
         const authorMap = new Map()
-        // edgeMap: "idA|idB" → weight (shared work count)
         const edgeMap = new Map()
 
         for (const work of works) {

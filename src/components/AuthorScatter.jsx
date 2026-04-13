@@ -36,14 +36,20 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
   const plotAreaRef = useRef(null)
   const [search, setSearch] = useState("")
   const [tooltip, setTooltip] = useState(null)
+  const [selectedInstitutions, setSelectedInstitutions] = useState([])
   const [dims, setDims] = useState({ width: 600, height: 400 })
   const minVisible = Math.min(5, Math.max(1, visibleMax))
+  const selectedInstitutionSet = useMemo(() => new Set(selectedInstitutions), [selectedInstitutions])
+  const hasInstitutionFilter = selectedInstitutions.length > 0
+  const rankedNodes = useMemo(
+    () => [...nodes].sort((a, b) => b.paperCount - a.paperCount).slice(0, visibleN),
+    [nodes, visibleN]
+  )
 
   const instColorMap = useMemo(() => {
     const map = {}
     let idx = 0
-    const sorted = [...nodes].sort((a, b) => b.paperCount - a.paperCount)
-    for (const n of sorted) {
+    for (const n of rankedNodes) {
       if (!map[n.institution]) {
         map[n.institution] =
           n.institution === "Unknown"
@@ -52,7 +58,15 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
       }
     }
     return map
-  }, [nodes])
+  }, [rankedNodes])
+
+  const toggleInstitution = (institution) => {
+    if (selectedInstitutionSet.has(institution)) {
+      setSelectedInstitutions(selectedInstitutions.filter((item) => item !== institution))
+      return
+    }
+    setSelectedInstitutions([...selectedInstitutions, institution])
+  }
 
   useEffect(() => {
     if (!plotAreaRef.current) return
@@ -73,8 +87,8 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
     const plotWidth = chartWidth - padding.left - padding.right
     const plotHeight = chartHeight - padding.top - padding.bottom
 
-    const visibleNodes = [...nodes]
-      .sort((a, b) => b.paperCount - a.paperCount)
+    const visibleNodes = rankedNodes
+      .filter((a) => !hasInstitutionFilter || selectedInstitutionSet.has(a.institution))
       .slice(0, visibleN)
 
     const maxWorksRaw = d3.max(visibleNodes, (n) => n.paperCount) ?? 1
@@ -224,7 +238,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
         )
         .on("mouseleave", () => setTooltip(null))
     })
-  }, [dims, instColorMap, nodes, search, visibleN])
+  }, [dims, instColorMap, rankedNodes, search, visibleN, hasInstitutionFilter, selectedInstitutionSet])
 
   useEffect(() => {
     if (!nodes.length || !svgRef.current) return
@@ -291,15 +305,49 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
             flexShrink: 0,
           }}
         >
+          <button
+            onClick={() => setSelectedInstitutions([])}
+            style={{
+              fontSize: 10,
+              padding: "3px 6px",
+              borderRadius: 6,
+              border: !hasInstitutionFilter ? "1px solid rgba(37,99,235,0.45)" : "1px solid rgba(0,0,0,0.12)",
+              background: !hasInstitutionFilter ? "rgba(37,99,235,0.12)" : "rgba(255,255,255,0.8)",
+              color: !hasInstitutionFilter ? "#1d4ed8" : "rgba(15,23,42,0.7)",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            All institutions
+          </button>
           {Object.entries(instColorMap).map(([inst, col]) => (
-            <div key={inst} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+            <button
+              key={inst}
+              onClick={() => toggleInstitution(inst)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 10,
+                width: "100%",
+                borderRadius: 6,
+                border: selectedInstitutionSet.has(inst) ? "1px solid rgba(0,0,0,0.25)" : "1px solid transparent",
+                background: selectedInstitutionSet.has(inst) ? "rgba(255,255,255,0.85)" : "transparent",
+                padding: "2px 4px",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
               <svg width="16" height="16">
                 <circle cx="8" cy="8" r="5" fill={col} />
               </svg>
               <span style={{ color: "rgba(15,23,42,0.75)" }}>
                 {inst.length > 14 ? `${inst.slice(0, 12)}…` : inst}
               </span>
-            </div>
+              <span style={{ marginLeft: "auto", color: "rgba(15,23,42,0.55)", opacity: selectedInstitutionSet.has(inst) ? 1 : 0 }}>
+                ✓
+              </span>
+            </button>
           ))}
         </div>
       </div>
