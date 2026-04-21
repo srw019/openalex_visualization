@@ -34,11 +34,11 @@ npm run preview
 
 The following are examples of prompts used for limited coding support in this project:
 
-1. "How can I structure nested API data into a format suitable for D3 hierarchy?"
-2. "Why is my React component not updating after fetching data with useEffect?"
-3. "How can I position a tooltip near the mouse cursor in React?"
-4. "How do I handle multiple API calls and combine their results in React?"
-5. "How can I limit large datasets to improve performance in a D3 visualization?"
-6. "Why is my D3 force graph overlapping too much and how can I fix node collisions?"
-7. "How can I add simple filtering (like by institution/category) in a D3 visualization?"
-8. "How do I implement a basic search over a list of items and highlight matches?"
+1. "how can i structure nested API data so it works properly with a D3 hierarchy"
+2. "why is my React component not updating after fetching data with useEffect, what could be wrong"
+3. "how can i position a tooltip near the mouse cursor in React so it follows smoothly"
+4. "what is a simple way to handle multiple API calls and combine the results in React"
+5. "how can i limit large datasets so my D3 visualization doesn’t lag or slow down"
+6. "my D3 force graph nodes are overlapping a lot, how can i fix the collisions or spacing"
+7. "how can i add simple filtering like by institution or category in a D3 visualization"
+8. "how do i implement a basic search over a list and highlight the matching items"
