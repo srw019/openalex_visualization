@@ -10,7 +10,7 @@ const UNKNOWN_COLOR = "#A0A0A0"
 const LEGEND_WIDTH = 190
 
 function matchesAuthorName(authorName, query) {
-  // Reuse the same token-based search behavior as the network view.
+  // Same token-based name search as network view.
   const q = query.trim().toLowerCase()
   if (!q) return true
 
@@ -42,7 +42,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
   const minVisible = Math.min(5, Math.max(1, visibleMax))
   const selectedInstitutionSet = useMemo(() => new Set(selectedInstitutions), [selectedInstitutions])
   const hasInstitutionFilter = selectedInstitutions.length > 0
-  // Keep the top authors for the current slider range so the plot remains manageable.
+  // Keep top authors for the current slider range.
   const rankedNodes = useMemo(
     () => [...nodes].sort((a, b) => b.paperCount - a.paperCount).slice(0, visibleN),
     [nodes, visibleN]
@@ -71,7 +71,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
   }
 
   useEffect(() => {
-    // Measure the plotting area before drawing the chart.
+    // Measure plotting area before drawing.
     if (!plotAreaRef.current) return
     const ro = new ResizeObserver(([entry]) => {
       setDims({
@@ -84,7 +84,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
   }, [])
 
   const draw = useCallback(() => {
-    // The chart is redrawn from scratch each time because D3 owns the SVG content.
+    // Redraw from scratch because D3 owns SVG nodes.
     const chartWidth = Math.max(dims.width, 220)
     const chartHeight = dims.height
     const padding = { left: 66, right: 28, top: 28, bottom: 58 }
@@ -95,7 +95,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
       .filter((a) => !hasInstitutionFilter || selectedInstitutionSet.has(a.institution))
       .slice(0, visibleN)
 
-    // Build scales from the current visible data range.
+    // Build scales from current visible data.
     const maxWorksRaw = d3.max(visibleNodes, (n) => n.paperCount) ?? 1
     const maxCitRaw = d3.max(visibleNodes, (n) => n.citations ?? 0) ?? 1
     const maxWorks = Math.max(1, maxWorksRaw) * 1.05
@@ -197,7 +197,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
 
     const searchQuery = search.toLowerCase().trim()
     const plottedNodes = visibleNodes.map((a) => {
-      // Each point gets its own radius, color, and search-state metadata.
+      // Compute per-point size, color, and search state.
       const r = Math.max(5, Math.sqrt(a.paperCount) * 1.6)
       const col = instColorMap[a.institution] ?? UNKNOWN_COLOR
       const isMatch = matchesAuthorName(a.name, searchQuery)
@@ -224,7 +224,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
         .attr("opacity", a.op)
 
       if (glow > 0) {
-        // A soft glow helps matching search results stand out.
+        // Soft glow for search matches.
         ng.append("circle")
           .attr("r", a.r + 8)
           .attr("fill", a.col)
@@ -269,7 +269,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8, flexShrink: 0 }}>
-        {/* Controls stay above the chart so the plot area can use the full width. */}
+        {/* Controls stay above the chart area. */}
         <span style={lbl}>Authors</span>
         <input
           type="range"
@@ -313,7 +313,7 @@ export default function AuthorScatter({ nodes, visibleN, onVisibleNChange, visib
             flexShrink: 0,
           }}
         >
-          {/* Institution buttons act as a quick legend filter. */}
+          {/* Institution buttons act as legend filters. */}
           <button
             onClick={() => setSelectedInstitutions([])}
             style={{

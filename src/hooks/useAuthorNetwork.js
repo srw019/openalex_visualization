@@ -40,11 +40,10 @@ export function useAuthorNetwork(subfieldId) {
 
   useEffect(() => {
     if (!subfieldId) return
-    // Reset to loading whenever the selected subfield changes.
+    // Reset loading state when subfield changes.
     setState((s) => ({ ...s, loading: true, error: null }))
 
     async function fetchWorks() {
-      // Page through OpenAlex works until we hit the scan limit.
       const rawId = idSuffix(subfieldId)
       const allWorks = []
       let cursor = "*"
@@ -77,7 +76,7 @@ export function useAuthorNetwork(subfieldId) {
       try {
         const works = await fetchWorks()
 
-        // Aggregate works into author-level nodes and co-authorship edges.
+        // Build author nodes and co-author edges from works.
         const authorMap = new Map()
         const edgeMap = new Map()
 
@@ -114,7 +113,7 @@ export function useAuthorNetwork(subfieldId) {
         }
 
         const instTotals = new Map()
-        // Keep only the busiest institutions and authors so the graph stays readable.
+        // Keep top institutions/authors so the graph stays readable.
         for (const author of authorMap.values()) {
           instTotals.set(
             author.institution,
@@ -144,7 +143,7 @@ export function useAuthorNetwork(subfieldId) {
 
         const institutions = new Set(nodes.map((n) => n.institution))
 
-        // Count how many works remain represented after node filtering.
+        // Count represented works after filtering authors.
         const workIdsForSelectedAuthors = new Set()
         for (const work of works) {
           for (const authorship of work.authorships ?? []) {

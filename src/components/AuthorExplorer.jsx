@@ -20,7 +20,7 @@ export default function AuthorExplorer({
   width,
   height,
 }) {
-  // The explorer keeps the current tab and visible author count locally.
+  // Keep tab state and visible author count here.
   const [activeTab, setActiveTab] = useState("network")
   const [visibleN, setVisibleN] = useState(50)
   const { nodes, edges, stats, loading, error } = useAuthorNetwork(subfieldId)
@@ -32,7 +32,7 @@ export default function AuthorExplorer({
   const hasInsufficientData = !loading && !error && nodes.length < 3
   const canShowCharts = !loading && !error && nodes.length >= 3
 
-  // Jump back to the selected field if the parent view provides one.
+  // Jump back to the selected field if available.
   const handleFieldClick = () => field && onBackToField && onBackToField(field)
 
   const summaryItems = [

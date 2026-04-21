@@ -8,13 +8,13 @@ export default function App() {
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ width: 1200, height: 800 })
   const [selectedSubfield, setSelectedSubfield] = useState(null)
-  // This single state value controls which screen the user is currently on.
+  // Track which screen should be shown.
   const selectedView = selectedSubfield?.type ?? "root"
   const showCirclePack = Boolean(data) && selectedView !== "subfield"
   const circleFocusPath = selectedView === "field" ? [selectedSubfield.field] : []
 
   useEffect(() => {
-    // Keep the visualizations sized to the available container area.
+    // Keep charts responsive to container size.
     if (!containerRef.current) return
     const ro = new ResizeObserver(([entry]) => {
       setDims({
@@ -27,7 +27,7 @@ export default function App() {
   }, [])
 
   const handleSubfieldSelect = (subfieldData) => {
-    // Store the selected leaf node plus its parent metadata for the next view.
+    // Save clicked subfield info for the author view.
     const { subfieldId, subfieldName, fieldName, domainName, field } = subfieldData
     setSelectedSubfield({
       type: "subfield",
@@ -40,7 +40,7 @@ export default function App() {
   }
 
   const handleBackToField = (fieldObject) => {
-    // Returning to a field keeps the circle pack focused at that level.
+    // Go back to the field-level circle pack.
     setSelectedSubfield({
       type: "field",
       field: fieldObject,

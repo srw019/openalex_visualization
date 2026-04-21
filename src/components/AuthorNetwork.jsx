@@ -12,7 +12,7 @@ const UNKNOWN_COLOR = "#A0A0A0"
 const getNodeId = (value) => value?.id ?? value
 
 function matchesAuthorName(authorName, query) {
-  // Search is token-based so it works well for author names.
+  // Token-based search works better for names.
   const q = query.trim().toLowerCase()
   if (!q) return true
 
@@ -49,7 +49,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   const selectedInstitutionSet = useMemo(() => new Set(selectedInstitutions), [selectedInstitutions])
   const hasInstitutionFilter = selectedInstitutions.length > 0
 
-  // Keep selection logic in small helpers so the D3 effect stays readable.
+  // Keep selection logic in small helpers.
   const clearSelection = () => {
     selectedNodeRef.current = null
     setSelectedNodeId(null)
@@ -128,7 +128,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   }, [selectedNodeId])
 
   useEffect(() => {
-    // Rebuild the SVG whenever the visible author set or filters change.
+    // Rebuild SVG when visible data or filters change.
     const svg = d3.select(svgRef.current)
     const container = svgRef.current?.parentElement
     if (!container) return
@@ -164,7 +164,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
     })
 
     const sim = d3.forceSimulation(simNodes)
-      // Link, charge, collide, and center forces create the final network layout.
+      // Core forces for network layout.
       .force("link",
         d3.forceLink(simEdges)
           .id((d) => d.id)
@@ -215,7 +215,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       .on("mouseleave", () => setTooltip(null))
 
     const applySelectionStyles = () => {
-      // Selected nodes keep their neighborhood highlighted while the rest fade out.
+      // Highlight selected neighborhood and fade other nodes.
       const currentSelectedId = selectedNodeRef.current
       const selectedNeighbors = new Set()
 
@@ -300,7 +300,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   }, [selectedNodeId, selectedInstitutions, search, visibleN])
 
   useEffect(() => {
-    // Smoothly zoom into the selected node's connected cluster.
+    // Smooth zoom into selected node cluster.
     const svgElement = d3.select(svgRef.current)
     const zoomBehavior = zoomBehaviorRef.current
     const simNodes = simNodesRef.current
@@ -377,7 +377,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           color: "rgba(15,23,42,0.72)",
         }}
       >
-        {/* Search, count slider, and selected-node reset live in one compact toolbar. */}
+        {/* Top controls: count slider, search, and reset. */}
         <span>Authors</span>
         <input
           type="range" min={minVisible} max={Math.max(minVisible, visibleMax)} step={1}
@@ -445,7 +445,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           overflowY: "auto",
         }}
       >
-        {/* The legend doubles as a filter for institutions. */}
+        {/* Legend also works as an institution filter. */}
         <button
           onClick={() => applyInstitutionFilter([])}
           style={{

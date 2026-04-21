@@ -14,7 +14,7 @@ const truncateLabel = (label, maxLength) =>
   (label.length > maxLength ? `${label.slice(0, maxLength - 1)}…` : label)
 
 const getNodeLabel = (name, radius) => {
-  // Use initials for very small circles and a truncated label otherwise.
+  // Use initials for tiny circles, otherwise a shortened label.
   const fontSize = Math.min(Math.max(radius / 3.1, 8), 15)
   const maxChars = Math.max(Math.floor((radius * 1.75) / (fontSize * 0.56)), 2)
 
@@ -40,7 +40,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   const [tooltip, setTooltip] = useState({ node: null, x: 0, y: 0 })
   const [focusPath, setFocusPath] = useState(initialFocusPath)
 
-  // The root data is the selected domain tree that the user drills through.
+  // Root tree the user drills into.
   const categoryRoot = useMemo(() => {
     if (!data) return null
     return data.children?.[0] ?? data
@@ -62,7 +62,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }, [currentNode])
 
   const circles = useMemo(() => {
-    // Flatten the current level into pack layout input and compute circle positions.
+    // Build pack-layout input and compute circle positions.
     if (!currentNode || !width || !height) return []
 
     const shallowData = {
@@ -101,7 +101,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }, [categoryRoot, focusPath])
 
   const categoryColorMap = useMemo(() => {
-    // Assign a stable color to each top-level field.
+    // Keep stable colors for top-level fields.
     const map = {}
     for (const [index, child] of (categoryRoot?.children ?? []).entries()) {
       map[child.name] = PALETTE[index % PALETTE.length]
@@ -110,7 +110,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }, [categoryRoot])
 
   const handleCircleClick = (node) => {
-    // Clicking a field drills deeper; clicking a leaf opens the author explorer.
+    // Field click drills in; leaf click opens author explorer.
     const original = originalChildren[node.data.name]
 
     if (original?.children?.length) {
@@ -133,7 +133,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }
 
   const handleBreadcrumbClick = (index) => {
-    // Breadcrumbs let the user jump back to an earlier level.
+    // Breadcrumb click jumps back to that level.
     setFocusPath((prev) => (index < 0 ? [] : prev.slice(0, index + 1)))
     setTooltip({ node: null, x: 0, y: 0 })
   }

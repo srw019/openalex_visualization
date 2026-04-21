@@ -1,12 +1,12 @@
 export function buildHierarchy(domains) {
-  // Convert OpenAlex domain, field, and subfield records into the tree used by CirclePack.
+  // Convert OpenAlex records into the CirclePack tree shape.
   const children = domains
     .filter((domain) => domain.fields && domain.fields.length > 0)
     .map((domain) => {
       const fieldChildren = domain.fields
         .filter((field) => field && field.display_name)
         .map((field) => {
-          // Subfields become leaf nodes; empty fields stay as direct nodes.
+          // Use subfields as leaves; keep empty fields as direct nodes.
           const subChildren = (field.subfields ?? [])
             .filter((sub) => sub && sub.display_name)
             .map((sub) => ({
