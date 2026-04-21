@@ -1,53 +1,10 @@
 import { useState, useEffect } from "react"
+import { buildHierarchy } from "../utils/dataTransform.js"
 
 const BASE = "https://api.openalex.org"
 const MAILTO = "srw019@uregina.ca"
 
 const getIdSuffix = (openAlexId) => String(openAlexId).split("/").pop()
-
-function buildHierarchy(domains) {
-  const children = domains
-    .filter((domain) => domain.fields && domain.fields.length > 0)
-    .map((domain) => {
-      const fieldChildren = domain.fields
-        .filter((field) => field && field.display_name)
-        .map((field) => {
-          const subChildren = (field.subfields ?? [])
-            .filter((sub) => sub && sub.display_name)
-            .map((sub) => ({
-              name: sub.display_name,
-              id: sub.id,
-              works_count: sub.works_count ?? 0,
-              value: Math.max(sub.works_count ?? 1, 1),
-            }))
-
-          if (subChildren.length === 0) {
-            return {
-              name: field.display_name,
-              id: field.id,
-              works_count: field.works_count ?? 0,
-              value: Math.max(field.works_count ?? 1, 1),
-            }
-          }
-
-          return {
-            name: field.display_name,
-            id: field.id,
-            works_count: field.works_count ?? 0,
-            children: subChildren,
-          }
-        })
-
-      return {
-        name: domain.display_name,
-        id: domain.id,
-        works_count: domain.works_count ?? 0,
-        children: fieldChildren,
-      }
-    })
-
-  return { name: "root", children }
-}
 
 export function useOpenAlex() {
   const [data, setData] = useState(null)
@@ -56,11 +13,15 @@ export function useOpenAlex() {
 
   useEffect(() => {
     async function fetchAll() {
+      // Small helper so each OpenAlex request stays readable.
+      const fetchJson = async (url) => {
+        const response = await fetch(url)
+        return response.json()
+      }
+
       try {
-        const domainRes = await fetch(
-          `${BASE}/domains?per-page=200&mailto=${MAILTO}`
-        )
-        const domainJson = await domainRes.json()
+        // Load the top-level domain list and keep only Physical Sciences.
+        const domainJson = await fetchJson(`${BASE}/domains?per-page=200&mailto=${MAILTO}`)
         const physicalSci = domainJson.results.find(
           (d) => d.display_name === "Physical Sciences"
         )
@@ -68,27 +29,28 @@ export function useOpenAlex() {
         if (!physicalSci) throw new Error("Physical Sciences domain not found")
 
         const domainId = getIdSuffix(physicalSci.id)
-        const fRes = await fetch(
+        // Fetch all fields in the selected domain.
+        const fJson = await fetchJson(
           `${BASE}/fields?filter=domain.id:${domainId}&per-page=200&mailto=${MAILTO}`
         )
-        const fJson = await fRes.json()
 
         if (!Array.isArray(fJson.results) || fJson.results.length === 0) {
           throw new Error("No fields returned for Physical Sciences from OpenAlex")
         }
 
         const fieldsWithSubs = await Promise.all(
+          // Enrich each field with its subfields before building the hierarchy.
           fJson.results.map(async (field) => {
             const fieldId = getIdSuffix(field.id)
-            const sRes = await fetch(
+            const sJson = await fetchJson(
               `${BASE}/subfields?filter=field.id:${fieldId}&per-page=200&mailto=${MAILTO}`
             )
-            const sJson = await sRes.json()
             return { ...field, subfields: sJson.results ?? [] }
           })
         )
 
         const enrichedDomain = { ...physicalSci, fields: fieldsWithSubs }
+        // Convert the API response into the tree structure used by the UI.
         const hierarchy = buildHierarchy([enrichedDomain])
 
         if (!hierarchy.children?.length) {

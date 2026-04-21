@@ -4,6 +4,10 @@ import AuthorNetwork from "./AuthorNetwork.jsx"
 import AuthorScatter from "./AuthorScatter.jsx"
 
 const MAX_VISIBLE_AUTHORS = 100
+const TABS = [
+  { key: "network", label: "Institution author network" },
+  { key: "scatter", label: "Author influence" },
+]
 
 export default function AuthorExplorer({
   subfieldId,
@@ -16,6 +20,7 @@ export default function AuthorExplorer({
   width,
   height,
 }) {
+  // The explorer keeps the current tab and visible author count locally.
   const [activeTab, setActiveTab] = useState("network")
   const [visibleN, setVisibleN] = useState(50)
   const { nodes, edges, stats, loading, error } = useAuthorNetwork(subfieldId)
@@ -24,10 +29,11 @@ export default function AuthorExplorer({
   const visibleNClamped = visibleMax
     ? Math.min(Math.max(visibleN, minVisible), visibleMax)
     : visibleN
+  const hasInsufficientData = !loading && !error && nodes.length < 3
+  const canShowCharts = !loading && !error && nodes.length >= 3
 
-  const handleFieldClick = () => {
-    if (field && onBackToField) onBackToField(field)
-  }
+  // Jump back to the selected field if the parent view provides one.
+  const handleFieldClick = () => field && onBackToField && onBackToField(field)
 
   const summaryItems = [
     { label: "Authors", value: stats.authorCount },
@@ -75,8 +81,6 @@ export default function AuthorExplorer({
         <span style={{ color: "rgba(15,23,42,0.3)" }}>›</span>
         <span style={{ color: "#0f172a", fontWeight: 600 }}>{subfieldName}</span>
 
-
-
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           {summaryItems.map((s) => (
             <div
@@ -110,10 +114,7 @@ export default function AuthorExplorer({
           background: "#f3f4f6",
         }}
       >
-        {[
-          { key: "network", label: "Institution author network" },
-          { key: "scatter", label: "Author influence" },
-        ].map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -168,7 +169,7 @@ export default function AuthorExplorer({
           </div>
         )}
 
-        {!loading && !error && nodes.length < 3 && (
+        {hasInsufficientData && (
           <div
             style={{
               display: "flex",
@@ -187,7 +188,7 @@ export default function AuthorExplorer({
           </div>
         )}
 
-        {!loading && !error && nodes.length >= 3 && (
+        {canShowCharts && (
           <>
             {activeTab === "network" && (
               <AuthorNetwork

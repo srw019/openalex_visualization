@@ -17,6 +17,15 @@ const INITIAL_STATE = {
 
 const idSuffix = (url) => String(url ?? "").split("/").pop()
 
+const createInitialAuthor = (authorship) => ({
+  id: idSuffix(authorship.author?.id),
+  name: authorship.author?.display_name ?? "Unknown",
+  institution: authorship.institutions?.[0]?.display_name ?? "Unknown",
+  paperCount: 0,
+  citations: 0,
+  workTypes: { article: 0, book: 0, dataset: 0, other: 0 },
+})
+
 function normalizeType(type) {
   if (!type) return "other"
   const t = type.toLowerCase()
@@ -31,9 +40,11 @@ export function useAuthorNetwork(subfieldId) {
 
   useEffect(() => {
     if (!subfieldId) return
+    // Reset to loading whenever the selected subfield changes.
     setState((s) => ({ ...s, loading: true, error: null }))
 
     async function fetchWorks() {
+      // Page through OpenAlex works until we hit the scan limit.
       const rawId = idSuffix(subfieldId)
       const allWorks = []
       let cursor = "*"
@@ -66,6 +77,7 @@ export function useAuthorNetwork(subfieldId) {
       try {
         const works = await fetchWorks()
 
+        // Aggregate works into author-level nodes and co-authorship edges.
         const authorMap = new Map()
         const edgeMap = new Map()
 
@@ -73,23 +85,16 @@ export function useAuthorNetwork(subfieldId) {
           const type = normalizeType(work.type)
           const workCit = work.cited_by_count ?? 0
           const authorships = work.authorships ?? []
-          const authorIdsInWork = []
+          const workAuthorIds = []
 
           for (const authorship of authorships) {
             const authorId = idSuffix(authorship.author?.id)
             if (!authorId) continue
 
-            authorIdsInWork.push(authorId)
+            workAuthorIds.push(authorId)
 
             if (!authorMap.has(authorId)) {
-              authorMap.set(authorId, {
-                id: authorId,
-                name: authorship.author?.display_name ?? "Unknown",
-                institution: authorship.institutions?.[0]?.display_name ?? "Unknown",
-                paperCount: 0,
-                citations: 0,
-                workTypes: { article: 0, book: 0, dataset: 0, other: 0 },
-              })
+              authorMap.set(authorId, createInitialAuthor(authorship))
             }
 
             const author = authorMap.get(authorId)
@@ -98,10 +103,10 @@ export function useAuthorNetwork(subfieldId) {
             author.workTypes[type] = (author.workTypes[type] ?? 0) + 1
           }
 
-          for (let i = 0; i < authorIdsInWork.length; i++) {
-            for (let j = i + 1; j < authorIdsInWork.length; j++) {
-              const a = authorIdsInWork[i]
-              const b = authorIdsInWork[j]
+          for (let i = 0; i < workAuthorIds.length; i++) {
+            for (let j = i + 1; j < workAuthorIds.length; j++) {
+              const a = workAuthorIds[i]
+              const b = workAuthorIds[j]
               const key = a < b ? `${a}|${b}` : `${b}|${a}`
               edgeMap.set(key, (edgeMap.get(key) ?? 0) + 1)
             }
@@ -109,6 +114,7 @@ export function useAuthorNetwork(subfieldId) {
         }
 
         const instTotals = new Map()
+        // Keep only the busiest institutions and authors so the graph stays readable.
         for (const author of authorMap.values()) {
           instTotals.set(
             author.institution,
@@ -138,6 +144,7 @@ export function useAuthorNetwork(subfieldId) {
 
         const institutions = new Set(nodes.map((n) => n.institution))
 
+        // Count how many works remain represented after node filtering.
         const workIdsForSelectedAuthors = new Set()
         for (const work of works) {
           for (const authorship of work.authorships ?? []) {

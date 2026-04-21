@@ -12,6 +12,7 @@ const UNKNOWN_COLOR = "#A0A0A0"
 const getNodeId = (value) => value?.id ?? value
 
 function matchesAuthorName(authorName, query) {
+  // Search is token-based so it works well for author names.
   const q = query.trim().toLowerCase()
   if (!q) return true
 
@@ -48,28 +49,37 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   const selectedInstitutionSet = useMemo(() => new Set(selectedInstitutions), [selectedInstitutions])
   const hasInstitutionFilter = selectedInstitutions.length > 0
 
+  // Keep selection logic in small helpers so the D3 effect stays readable.
+  const clearSelection = () => {
+    selectedNodeRef.current = null
+    setSelectedNodeId(null)
+  }
+
+  const setSelectedAuthor = (authorId) => {
+    selectedNodeRef.current = authorId
+    setSelectedNodeId(authorId)
+  }
+
   const getVisibleAuthors = (sourceNodes, activeInstitutions, limit) =>
     sourceNodes
       .filter((n) => activeInstitutions.length === 0 || activeInstitutions.includes(n.institution))
       .sort((a, b) => b.paperCount - a.paperCount)
       .slice(0, limit)
 
-  const rankedNodes = useMemo(
+  const visibleNodes = useMemo(
     () => [...nodes].sort((a, b) => b.paperCount - a.paperCount).slice(0, visibleN),
     [nodes, visibleN]
   )
 
-  const filteredNodes = useMemo(
+  const institutionFilteredNodes = useMemo(
     () => getVisibleAuthors(nodes, selectedInstitutions, visibleN),
     [nodes, selectedInstitutions, visibleN]
   )
 
-  const sortedNodes = filteredNodes
-
   const instColorMap = useMemo(() => {
     const map = {}
     let idx = 0
-    for (const n of rankedNodes) {
+    for (const n of visibleNodes) {
       if (!map[n.institution]) {
         if (n.institution === UNKNOWN_INSTITUTION) {
           map[n.institution] = UNKNOWN_COLOR
@@ -80,9 +90,9 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       }
     }
     return map
-  }, [rankedNodes])
+  }, [visibleNodes])
 
-  const visibleIds = useMemo(() => new Set(sortedNodes.map((n) => n.id)), [sortedNodes])
+  const visibleIds = useMemo(() => new Set(institutionFilteredNodes.map((n) => n.id)), [institutionFilteredNodes])
   const visibleEdges = useMemo(
     () => edges.filter((e) => visibleIds.has(e.source) && visibleIds.has(e.target)),
     [edges, visibleIds]
@@ -102,8 +112,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
     setSelectedInstitutions(nextSelectedInstitutions)
 
     const nextSelectedNodeId = resolveSelectedNodeId(search, nextSelectedInstitutions, visibleN)
-    selectedNodeRef.current = nextSelectedNodeId
-    setSelectedNodeId(nextSelectedNodeId)
+    setSelectedAuthor(nextSelectedNodeId)
   }
 
   const toggleInstitution = (institution) => {
@@ -119,6 +128,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
   }, [selectedNodeId])
 
   useEffect(() => {
+    // Rebuild the SVG whenever the visible author set or filters change.
     const svg = d3.select(svgRef.current)
     const container = svgRef.current?.parentElement
     if (!container) return
@@ -134,12 +144,9 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       .attr("fill", "transparent")
       .style("pointer-events", "all")
       .style("cursor", "default")
-      .on("click", () => {
-        selectedNodeRef.current = null
-        setSelectedNodeId(null)
-      })
+      .on("click", clearSelection)
 
-    const simNodes = sortedNodes.map((n) => ({ ...n }))
+    const simNodes = institutionFilteredNodes.map((n) => ({ ...n }))
     const simEdges = visibleEdges.map((e) => ({ ...e }))
     simNodesRef.current = simNodes
     simEdgesRef.current = simEdges
@@ -157,6 +164,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
     })
 
     const sim = d3.forceSimulation(simNodes)
+      // Link, charge, collide, and center forces create the final network layout.
       .force("link",
         d3.forceLink(simEdges)
           .id((d) => d.id)
@@ -184,8 +192,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       .style("cursor", "pointer")
       .on("click", (event, d) => {
         event.stopPropagation()
-        selectedNodeRef.current = d.id
-        setSelectedNodeId(d.id)
+        setSelectedAuthor(d.id)
       })
       .call(
         d3.drag()
@@ -208,6 +215,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
       .on("mouseleave", () => setTooltip(null))
 
     const applySelectionStyles = () => {
+      // Selected nodes keep their neighborhood highlighted while the rest fade out.
       const currentSelectedId = selectedNodeRef.current
       const selectedNeighbors = new Set()
 
@@ -247,10 +255,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
 
     paintSelectionRef.current = applySelectionStyles
 
-    svg.on("click", () => {
-      selectedNodeRef.current = null
-      setSelectedNodeId(null)
-    })
+    svg.on("click", clearSelection)
 
     const nodeCircleSel = nodeSel.append("circle")
       .attr("r", (d) => Math.max(7, Math.sqrt(d.paperCount) * 3))
@@ -288,13 +293,14 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
     })
 
     return () => sim.stop()
-  }, [sortedNodes, visibleEdges, instColorMap, hasInstitutionFilter, selectedInstitutionSet])
+  }, [institutionFilteredNodes, visibleEdges, instColorMap, hasInstitutionFilter, selectedInstitutionSet])
 
   useEffect(() => {
     paintSelectionRef.current?.()
   }, [selectedNodeId, selectedInstitutions, search, visibleN])
 
   useEffect(() => {
+    // Smoothly zoom into the selected node's connected cluster.
     const svgElement = d3.select(svgRef.current)
     const zoomBehavior = zoomBehaviorRef.current
     const simNodes = simNodesRef.current
@@ -371,6 +377,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           color: "rgba(15,23,42,0.72)",
         }}
       >
+        {/* Search, count slider, and selected-node reset live in one compact toolbar. */}
         <span>Authors</span>
         <input
           type="range" min={minVisible} max={Math.max(minVisible, visibleMax)} step={1}
@@ -380,8 +387,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
             onVisibleNChange(nextVisibleN)
 
             const nextSelectedNodeId = resolveSelectedNodeId(search, selectedInstitutions, nextVisibleN)
-            selectedNodeRef.current = nextSelectedNodeId
-            setSelectedNodeId(nextSelectedNodeId)
+            setSelectedAuthor(nextSelectedNodeId)
           }}
           style={{ width: 70 }}
         />
@@ -395,8 +401,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
             setSearch(nextSearch)
 
             const nextSelectedNodeId = resolveSelectedNodeId(nextSearch, selectedInstitutions, visibleN)
-            selectedNodeRef.current = nextSelectedNodeId
-            setSelectedNodeId(nextSelectedNodeId)
+            setSelectedAuthor(nextSelectedNodeId)
           }}
           placeholder="Search author"
           style={{
@@ -412,10 +417,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
 
         {selectedNodeId && (
           <button
-            onClick={() => {
-              selectedNodeRef.current = null
-              setSelectedNodeId(null)
-            }}
+            onClick={clearSelection}
             style={{
               fontSize: 11,
               padding: "3px 8px",
@@ -443,6 +445,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           overflowY: "auto",
         }}
       >
+        {/* The legend doubles as a filter for institutions. */}
         <button
           onClick={() => applyInstitutionFilter([])}
           style={{
@@ -462,6 +465,7 @@ export default function AuthorNetwork({ nodes, edges, visibleN, onVisibleNChange
           <button
             key={inst}
             onClick={() => toggleInstitution(inst)}
+            title={inst}
             style={{
               display: "flex",
               alignItems: "center",

@@ -10,11 +10,37 @@ const PALETTE = [
 
 const TOP_UI_HEIGHT = 96
 
+const truncateLabel = (label, maxLength) =>
+  (label.length > maxLength ? `${label.slice(0, maxLength - 1)}…` : label)
+
+const getNodeLabel = (name, radius) => {
+  // Use initials for very small circles and a truncated label otherwise.
+  const fontSize = Math.min(Math.max(radius / 3.1, 8), 15)
+  const maxChars = Math.max(Math.floor((radius * 1.75) / (fontSize * 0.56)), 2)
+
+  if (maxChars <= 2) {
+    const initials = name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("")
+
+    return { label: initials || name.slice(0, 1), fontSize }
+  }
+
+  return {
+    label: truncateLabel(name, Math.max(maxChars - 1, 3)),
+    fontSize,
+  }
+}
+
 export default function CirclePack({ data, width, height, onSubfieldSelect, initialFocusPath = [] }) {
   const containerRef = useRef(null)
   const [tooltip, setTooltip] = useState({ node: null, x: 0, y: 0 })
   const [focusPath, setFocusPath] = useState(initialFocusPath)
 
+  // The root data is the selected domain tree that the user drills through.
   const categoryRoot = useMemo(() => {
     if (!data) return null
     return data.children?.[0] ?? data
@@ -36,6 +62,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }, [currentNode])
 
   const circles = useMemo(() => {
+    // Flatten the current level into pack layout input and compute circle positions.
     if (!currentNode || !width || !height) return []
 
     const shallowData = {
@@ -74,6 +101,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }, [categoryRoot, focusPath])
 
   const categoryColorMap = useMemo(() => {
+    // Assign a stable color to each top-level field.
     const map = {}
     for (const [index, child] of (categoryRoot?.children ?? []).entries()) {
       map[child.name] = PALETTE[index % PALETTE.length]
@@ -82,6 +110,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
   }, [categoryRoot])
 
   const handleCircleClick = (node) => {
+    // Clicking a field drills deeper; clicking a leaf opens the author explorer.
     const original = originalChildren[node.data.name]
 
     if (original?.children?.length) {
@@ -90,23 +119,21 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
       return
     }
 
-    if (original?.id && onSubfieldSelect) {
-      const domainName = categoryRoot?.name || "Unknown"
-      const fieldName = focusPath.length > 0 ? focusPath[focusPath.length - 1].name : "Unknown"
-      const parentField = focusPath.length > 0 ? focusPath[focusPath.length - 1] : null
-      const subfieldName = original.name
-      
-      onSubfieldSelect({
-        subfieldId: original.id,
-        subfieldName: subfieldName,
-        fieldName: fieldName,
-        domainName: domainName,
-        field: parentField,
-      })
-    }
+    if (!original?.id || !onSubfieldSelect) return
+
+    const parentField = focusPath[focusPath.length - 1] ?? null
+
+    onSubfieldSelect({
+      subfieldId: original.id,
+      subfieldName: original.name,
+      fieldName: parentField?.name ?? "Unknown",
+      domainName: categoryRoot?.name || "Unknown",
+      field: parentField,
+    })
   }
 
   const handleBreadcrumbClick = (index) => {
+    // Breadcrumbs let the user jump back to an earlier level.
     setFocusPath((prev) => (index < 0 ? [] : prev.slice(0, index + 1)))
     setTooltip({ node: null, x: 0, y: 0 })
   }
@@ -220,19 +247,7 @@ export default function CirclePack({ data, width, height, onSubfieldSelect, init
           const hasChildren = !!originalChildren[node.data.name]?.children?.length
           const isLeaf = !hasChildren && !!originalChildren[node.data.name]?.id
           const isClickable = hasChildren || isLeaf
-          const fontSize = Math.min(Math.max(node.r / 3.1, 8), 15)
-          const maxChars = Math.max(Math.floor((node.r * 1.75) / (fontSize * 0.56)), 2)
-          const initials = node.data.name
-            .split(/\s+/)
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part[0]?.toUpperCase() ?? "")
-            .join("")
-          const label = maxChars <= 2
-            ? initials || node.data.name.slice(0, 1)
-            : (node.data.name.length > maxChars
-              ? `${node.data.name.slice(0, Math.max(maxChars - 1, 3))}…`
-              : node.data.name)
+          const { label, fontSize } = getNodeLabel(node.data.name, node.r)
 
           return (
             <g

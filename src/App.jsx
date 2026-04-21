@@ -8,8 +8,13 @@ export default function App() {
   const containerRef = useRef(null)
   const [dims, setDims] = useState({ width: 1200, height: 800 })
   const [selectedSubfield, setSelectedSubfield] = useState(null)
+  // This single state value controls which screen the user is currently on.
+  const selectedView = selectedSubfield?.type ?? "root"
+  const showCirclePack = Boolean(data) && selectedView !== "subfield"
+  const circleFocusPath = selectedView === "field" ? [selectedSubfield.field] : []
 
   useEffect(() => {
+    // Keep the visualizations sized to the available container area.
     if (!containerRef.current) return
     const ro = new ResizeObserver(([entry]) => {
       setDims({
@@ -22,19 +27,22 @@ export default function App() {
   }, [])
 
   const handleSubfieldSelect = (subfieldData) => {
+    // Store the selected leaf node plus its parent metadata for the next view.
+    const { subfieldId, subfieldName, fieldName, domainName, field } = subfieldData
     setSelectedSubfield({
-      type: 'subfield',
-      subfieldId: subfieldData.subfieldId,
-      subfieldName: subfieldData.subfieldName,
-      fieldName: subfieldData.fieldName,
-      domainName: subfieldData.domainName,
-      field: subfieldData.field,
+      type: "subfield",
+      subfieldId,
+      subfieldName,
+      fieldName,
+      domainName,
+      field,
     })
   }
 
   const handleBackToField = (fieldObject) => {
+    // Returning to a field keeps the circle pack focused at that level.
     setSelectedSubfield({
-      type: 'field',
+      type: "field",
       field: fieldObject,
     })
   }
@@ -67,25 +75,16 @@ export default function App() {
             Error: {error.message}
           </div>
         )}
-        {data && !selectedSubfield && (
+        {showCirclePack && (
           <CirclePack
             data={data}
             width={dims.width}
             height={dims.height}
             onSubfieldSelect={handleSubfieldSelect}
-            initialFocusPath={[]}
+            initialFocusPath={circleFocusPath}
           />
         )}
-        {data && selectedSubfield?.type === 'field' && (
-          <CirclePack
-            data={data}
-            width={dims.width}
-            height={dims.height}
-            onSubfieldSelect={handleSubfieldSelect}
-            initialFocusPath={[selectedSubfield.field]}
-          />
-        )}
-        {selectedSubfield?.type === 'subfield' && (
+        {selectedView === "subfield" && (
           <AuthorExplorer
             subfieldId={selectedSubfield.subfieldId}
             subfieldName={selectedSubfield.subfieldName}
