@@ -1,5 +1,9 @@
 # OpenAlex Visualization
 
+## Live Demo
+
+https://openalex-visualization.netlify.app/
+
 ## How to run
 
 1. Install dependencies:
@@ -30,7 +34,7 @@ npm run preview
 
 "We acknowledge that we used an automated writing/coding assistant(ChatGPT, Claude) in this project to support revision, clarification, and coding assistance. We provided the input ourselves, reviewed the outputs carefully, and edited the final results for accuracy and correctness."
 
-### Prompt Examples Used
+### Prompt We Used
 
 The following are examples of prompts used for limited coding support in this project:
 
